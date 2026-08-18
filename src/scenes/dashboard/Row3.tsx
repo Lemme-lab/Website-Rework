@@ -1,92 +1,66 @@
-import { Box, Divider, Typography } from "@mui/material";
+import { useState, type FormEvent } from "react";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Divider,
+  MenuItem,
+  TextField,
+  Typography,
+} from "@mui/material";
 import Footer from "@/components/Footer";
 import SocialChips from "@/components/Socials";
 import { light } from "@/palette";
 
-type Skill = {
-  iconSrc: string;
-  text: string;
-};
+// Get a free access key at https://web3forms.com (it is safe to expose publicly).
+const WEB3FORMS_ACCESS_KEY = import.meta.env
+  .VITE_WEB3FORMS_ACCESS_KEY as string | undefined;
 
-type Experience = {
-  year: string;
+const CONTACT_EMAIL = "lucas.lenarcic@gmail.com";
+
+type SubmitStatus = "idle" | "sending" | "success" | "error";
+
+type Service = {
   title: string;
-  company: string;
   description: string;
+  bullets: string[];
+  popular?: boolean;
 };
 
-const softwareSkills: Skill[] = [
-  { iconSrc: "../../Images/c-.webp", text: "C/C++" },
-  { iconSrc: "../../Images/java.webp", text: "Java" },
-  { iconSrc: "../../Images/python.webp", text: "Python" },
-  { iconSrc: "../../Images/Flutter.webp", text: "Flutter" },
-  { iconSrc: "../../Images/java-script.webp", text: "JS" },
-  { iconSrc: "../../Images/nodejs.webp", text: "NodeJS" },
-  { iconSrc: "../../Images/React.webp", text: "React" },
-  { iconSrc: "../../Images/tensorflow.webp", text: "Tensorflow" },
-  { iconSrc: "../../Images/hibernate.webp", text: "Hibernate" },
-  { iconSrc: "../../Images/api.webp", text: "Rest API" },
-  { iconSrc: "../../Images/pentesting.webp", text: "Pentesting" },
-  { iconSrc: "../../Images/network.webp", text: "Network" },
-  { iconSrc: "../../Images/mysql.webp", text: "MySQL" },
-  { iconSrc: "../../Images/mongodb.webp", text: "MongoDB" },
-];
-
-const hardwareSkills: Skill[] = [
-  { iconSrc: "../../Images/mcu.webp", text: "Microcontroller" },
-  { iconSrc: "../../Images/soc.webp", text: "SOC" },
-  { iconSrc: "../../Images/analog.webp", text: "Analog" },
-  { iconSrc: "../../Images/digital.webp", text: "Digital" },
-  { iconSrc: "../../Images/pcb.webp", text: "PCB Design" },
-  { iconSrc: "../../Images/multisim.webp", text: "Simulation" },
-  { iconSrc: "../../Images/highspeed.webp", text: "Highspeed Design" },
-  { iconSrc: "../../Images/chip.webp", text: "IC Design" },
-];
-
-const experienceData: Experience[] = [
+const services: Service[] = [
   {
-    year: "2022",
-    title: "Technicus Award Winner",
-    company: "HTL Mössingerstraße",
-    description: 'Winner HTL Mössingerstraße "Technicus Award 2022" with Project Wuldor',
-  },
-  {
-    year: "2022",
-    title: "Internship",
-    company: "University Klagenfurt",
+    title: "Concept Design",
     description:
-      '1 Month "Machine Learning in Constrained Environments" Internship, Developing a Machine Learning Model for Transferring Still Images to Videos in Constrained Environments: Exploring Video Processing, Model Architecture, and Application Scenarios.',
+      "Working out what the product actually is: the technology behind it, how it is used, and which features earn their place.",
+    bullets: [
+      "Concept and product direction",
+      "Technology selection",
+      "Interaction and user flow",
+      "Feature set and scope",
+    ],
   },
   {
-    year: "2023",
-    title: "Technicus Award Winner",
-    company: "HTL Mössingerstraße",
-    description: 'Winner HTL Mössingerstraße "Technicus Award 2023" with Project Airframe',
-  },
-  {
-    year: "2023",
-    title: "Internship",
-    company: "SYMVARO GmbH",
+    title: "Full Product Build",
     description:
-      "Two-Month Internship Project: Developing a User-Centric App Utilizing an Alternative Framework to the Companys Standard. Emphasizing an Intuitive Frontend Integration with the Backend, Adhering to Industry Standards for Readable and Efficient Code.",
+      "Brief to production as a single engagement, with one point of contact for the whole product.",
+    bullets: [
+      "Prototype through production",
+      "Hardware, firmware and app",
+      "Testing and validation",
+      "Source and docs handed over",
+    ],
+    popular: true,
   },
   {
-    year: "2024",
-    title: "innovation@school among 10 funded projects - Diplomarbeit",
-    company: "HTL Mössingerstraße",
-    description: "Among the 10 funded projects with €2000, invited to the Tech-Gala in Carinthia",
-  },
-  {
-    year: "2024",
-    title: "innovation@school Winner - Diplomarbeit",
-    company: "HTL Mössingerstraße",
-    description: "Winner of the 2024 innovation@school Award with Cyclo Test Bench (CTB)",
-  },
-  {
-    year: "2024",
-    title: "Bosch Innovationspreis Top 5 - Diplomarbeit",
-    company: "HTL Mössingerstraße",
-    description: "Among the top 5 projects, invited to the Bosch Gala in Vienna",
+    title: "Software Engineering",
+    description:
+      "Firmware, app and backend built as one system, so the device and the cloud speak the same language.",
+    bullets: [
+      "Embedded firmware",
+      "App and interface",
+      "APIs and backend",
+      "Secure over-the-air updates",
+    ],
   },
 ];
 
@@ -99,273 +73,580 @@ const sectionSx = {
 
 const headingSx = {
   m: 0,
-  mb: { xs: "2rem", sm: "2.6rem" },
   color: light.ink,
-  fontSize: "clamp(2rem, 7vw, 2.5rem)",
-  lineHeight: 1.08,
-  letterSpacing: "-0.02em",
-  textAlign: "center",
+  fontSize: "clamp(2.2rem, 6vw, 4.2rem)",
+  lineHeight: 1.02,
+  letterSpacing: "-0.04em",
   overflowWrap: "anywhere",
 } as const;
 
-const SectionMark = () => (
-  <Box
-    aria-hidden="true"
-    sx={{
-      width: 50,
-      height: 3,
-      mx: "auto",
-      mb: { xs: "2rem", sm: "2.5rem" },
-      borderRadius: "999px",
-      backgroundColor: light.teal,
-    }}
-  />
-);
+const eyebrowSx = {
+  mb: "0.75rem",
+  color: light.inkFaint,
+  fontFamily: '"IBM Plex Mono", monospace',
+  fontSize: "0.78rem",
+  lineHeight: 1.4,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+} as const;
 
-const SkillBox = ({ iconSrc, text }: Skill) => (
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "12px",
+    backgroundColor: light.paper,
+    color: light.ink,
+    "& fieldset": {
+      borderColor: light.hairSoft,
+    },
+    "&:hover fieldset": {
+      borderColor: light.hair,
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: light.teal,
+      borderWidth: "1px",
+    },
+  },
+  "& .MuiInputLabel-root": {
+    color: light.inkSoft,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: light.teal,
+  },
+} as const;
+
+const ServiceCard = ({
+  title,
+  description,
+  bullets,
+  popular,
+}: Service) => (
   <Box
     sx={{
+      position: "relative",
       minWidth: 0,
-      minHeight: { xs: 136, sm: 160, md: 175 },
-      width: "100%",
-      p: { xs: "1rem 0.7rem", sm: "1.35rem 0.9rem", md: "1.5rem 1rem" },
+      minHeight: { md: 440 },
+      p: { xs: "1.5rem", sm: "1.8rem", md: "2rem" },
       display: "flex",
       flexDirection: "column",
-      justifyContent: "center",
-      alignItems: "center",
-      gap: { xs: "0.8rem", sm: "1rem" },
-      textAlign: "center",
       borderRadius: { xs: "1rem", sm: "1.25rem" },
       backgroundColor: light.plate,
       border: `1px solid ${light.hairSoft}`,
-      boxShadow: light.lift,
-      transition: `transform 620ms ${light.ease}, box-shadow 620ms ${light.ease}`,
+      boxShadow: popular ? light.liftHover : light.lift,
+      transform: { md: popular ? "translateY(-10px)" : "none" },
+      transition: `transform 420ms ${light.ease}, box-shadow 420ms ${light.ease}`,
       "@media (hover: hover) and (pointer: fine)": {
         "&:hover": {
-          transform: "translateY(-5px)",
+          transform: { md: "translateY(-10px)" },
           boxShadow: light.liftHover,
         },
       },
     }}
   >
+    {popular && (
+      <Box
+        sx={{
+          position: "absolute",
+          top: { xs: 18, sm: 22 },
+          right: { xs: 18, sm: 22 },
+          px: "0.7rem",
+          py: "0.32rem",
+          borderRadius: "999px",
+          backgroundColor: light.ink,
+          color: light.paper,
+          fontFamily: '"IBM Plex Mono", monospace',
+          fontSize: "0.68rem",
+          fontWeight: 600,
+          letterSpacing: "0.02em",
+        }}
+      >
+        Popular
+      </Box>
+    )}
+
     <Box
+      aria-hidden="true"
       sx={{
-        width: { xs: "3.7rem", sm: "4.25rem", md: "4.6rem" },
-        height: { xs: "3.7rem", sm: "4.25rem", md: "4.6rem" },
-        flexShrink: 0,
-        borderRadius: { xs: "0.85rem", sm: "1rem" },
-        backgroundColor: light.console,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+        width: 44,
+        height: 44,
+        mb: "1.25rem",
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "50%",
+        backgroundColor: light.tealWash,
+        color: light.teal,
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontWeight: 700,
       }}
     >
-      <Box
-        component="img"
-        src={iconSrc}
-        alt=""
-        sx={{
-          width: { xs: "2rem", sm: "2.35rem", md: "2.6rem" },
-          height: { xs: "2rem", sm: "2.35rem", md: "2.6rem" },
-          objectFit: "contain",
-        }}
-      />
+      +
     </Box>
+
+    <Typography
+      variant="h4"
+      sx={{
+        mb: "0.65rem",
+        color: light.ink,
+        fontSize: "clamp(1.35rem, 4vw, 1.65rem)",
+        fontWeight: 650,
+        lineHeight: 1.15,
+        letterSpacing: "-0.025em",
+      }}
+    >
+      {title}
+    </Typography>
+
     <Typography
       sx={{
-        color: light.ink,
-        fontSize: { xs: "0.9rem", sm: "1rem", md: "1.05rem" },
-        fontWeight: 500,
-        lineHeight: 1.2,
-        overflowWrap: "anywhere",
+        mb: "1.5rem",
+        color: light.inkSoft,
+        fontSize: { xs: "0.95rem", sm: "1rem" },
+        lineHeight: 1.6,
       }}
     >
-      {text}
+      {description}
     </Typography>
+
+    <Box
+      component="ul"
+      sx={{
+        m: 0,
+        p: 0,
+        mb: "2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.85rem",
+        listStyle: "none",
+      }}
+    >
+      {bullets.map((bullet) => (
+        <Box
+          component="li"
+          key={bullet}
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.7rem",
+            color: light.inkSoft,
+            fontSize: { xs: "0.92rem", sm: "0.98rem" },
+            lineHeight: 1.45,
+          }}
+        >
+          <Box
+            component="span"
+            aria-hidden="true"
+            sx={{
+              mt: "0.05rem",
+              color: light.teal,
+              fontWeight: 800,
+              flexShrink: 0,
+            }}
+          >
+            ✓
+          </Box>
+          <Box component="span">{bullet}</Box>
+        </Box>
+      ))}
+    </Box>
+
+    <Button
+      component="a"
+      href="#book-a-meeting"
+      variant={popular ? "contained" : "outlined"}
+      disableElevation
+      sx={{
+        mt: "auto",
+        minHeight: 48,
+        borderRadius: "10px",
+        borderColor: popular ? light.ink : light.hair,
+        backgroundColor: popular ? light.ink : "transparent",
+        color: popular ? light.paper : light.ink,
+        fontWeight: 650,
+        textTransform: "none",
+        "&:hover": {
+          borderColor: light.ink,
+          backgroundColor: popular ? light.console : light.tealWash,
+        },
+      }}
+    >
+      Book a Meeting&nbsp;&nbsp;→
+    </Button>
   </Box>
 );
 
-const SkillSection = ({ title, skills }: { title: string; skills: Skill[] }) => (
+const ServicesSection = () => (
   <Box component="section" sx={sectionSx}>
-    <Box sx={{ width: "100%", maxWidth: "1000px", mx: "auto" }}>
-      <Typography variant="h3" sx={headingSx}>
-        {title}
-      </Typography>
-      <SectionMark />
+    <Box sx={{ width: "100%", maxWidth: "1180px", mx: "auto" }}>
+      <Box sx={{ mb: { xs: "2.5rem", md: "4rem" }, textAlign: "center" }}>
+        <Typography sx={eyebrowSx}>Services</Typography>
+        <Typography variant="h2" sx={{ ...headingSx, maxWidth: 900, mx: "auto" }}>
+          Choose how we can work together
+        </Typography>
+      </Box>
+
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: {
-            xs: "repeat(2, minmax(0, 1fr))",
-            sm: "repeat(3, minmax(0, 1fr))",
-            md: "repeat(4, minmax(0, 1fr))",
-          },
-          gap: { xs: "0.75rem", sm: "1rem", md: "1.25rem" },
-          "@media (max-width: 319px)": {
-            gridTemplateColumns: "minmax(0, 1fr)",
-          },
+          gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" },
+          gap: { xs: "1rem", sm: "1.25rem", md: "1.5rem" },
+          alignItems: "stretch",
         }}
       >
-        {skills.map((skill) => (
-          <SkillBox key={skill.text} {...skill} />
+        {services.map((service) => (
+          <ServiceCard key={service.title} {...service} />
         ))}
       </Box>
     </Box>
   </Box>
 );
 
-const ExperienceItem = ({ year, title, company, description }: Experience) => (
-  <Box
-    sx={{
-      position: "relative",
-      width: "100%",
-      minWidth: 0,
-      px: { xs: "1.15rem", sm: "2rem", md: "2.5rem" },
-      py: { xs: "2rem", sm: "2.35rem", md: "2.5rem" },
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      textAlign: "center",
-      borderRadius: { xs: "1rem", sm: "12px" },
-      backgroundColor: light.plate,
-      border: `1px solid ${light.hairSoft}`,
-      boxShadow: `${light.inset}, ${light.lift}`,
-      transition: `transform 620ms ${light.ease}, box-shadow 620ms ${light.ease}`,
-      "@media (hover: hover) and (pointer: fine)": {
-        "&:hover": {
-          transform: "translateY(-6px)",
-          boxShadow: `${light.inset}, ${light.liftHover}`,
+const BookingSection = () => {
+  const [status, setStatus] = useState<SubmitStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (status === "sending") return;
+
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    // Honeypot: bots fill hidden fields, humans do not.
+    if (data.get("botcheck")) return;
+
+    if (!WEB3FORMS_ACCESS_KEY) {
+      setStatus("error");
+      setErrorMessage(
+        "The form is not configured yet. Add VITE_WEB3FORMS_ACCESS_KEY to your .env file.",
+      );
+      return;
+    }
+
+    setStatus("sending");
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          subject: "New project inquiry from your portfolio",
+          from_name: "Portfolio booking form",
+          name: data.get("fullName"),
+          email: data.get("email"),
+          "Project type": data.get("projectType") || "Not specified",
+          "Budget range": data.get("budgetRange") || "Not specified",
+          "Preferred meeting time":
+            data.get("preferredMeetingTime") || "Not specified",
+          message: data.get("projectDetails") || "No details provided",
+        }),
+      });
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+      };
+
+      if (response.ok && result.success) {
+        setStatus("success");
+        form.reset();
+      } else {
+        setStatus("error");
+        setErrorMessage(
+          result.message ?? `Something went wrong. Email me at ${CONTACT_EMAIL}.`,
+        );
+      }
+    } catch {
+      setStatus("error");
+      setErrorMessage(
+        `Could not reach the server. Check your connection, or email me at ${CONTACT_EMAIL}.`,
+      );
+    }
+  };
+
+  const isSending = status === "sending";
+
+  return (
+  <Box
+    component="section"
+    id="book-a-meeting"
+    sx={{
+      ...sectionSx,
+      pt: { xs: "3rem", sm: "4rem", md: "5rem" },
+      borderTop: `1px solid ${light.hairSoft}`,
     }}
   >
     <Box
-      aria-hidden="true"
       sx={{
-        position: "absolute",
-        top: -15,
-        left: "calc(50% - 15px)",
-        width: 30,
-        height: 30,
-        borderRadius: "50%",
-        backgroundColor: light.teal,
-        border: `3px solid ${light.paper}`,
+        width: "100%",
+        maxWidth: "1180px",
+        mx: "auto",
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", md: "0.9fr 1.25fr" },
+        gap: { xs: "2.5rem", md: "4rem" },
+        alignItems: "start",
       }}
-    />
+    >
+      <Box sx={{ pt: { md: "0.4rem" } }}>
+        <Typography sx={eyebrowSx}>Contact / Book a Meeting</Typography>
+        <Typography variant="h2" sx={{ ...headingSx, mb: "2rem" }}>
+          Let&apos;s Work Together
+        </Typography>
 
-    <Typography
-      sx={{
-        mb: "0.9rem",
-        fontFamily: '"IBM Plex Mono", monospace',
-        color: light.inkFaint,
-        letterSpacing: "0.18em",
-        fontSize: "0.8rem",
-      }}
-    >
-      {year}
-    </Typography>
-    <Typography
-      variant="h5"
-      sx={{
-        mb: "0.8rem",
-        maxWidth: "100%",
-        color: light.ink,
-        fontWeight: 600,
-        fontSize: "clamp(1.1rem, 5vw, 1.35rem)",
-        lineHeight: 1.3,
-        overflowWrap: "anywhere",
-      }}
-    >
-      {title}
-    </Typography>
+        <Box
+          sx={{
+            mb: "2rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.95rem",
+          }}
+        >
+          {[
+            "Share your project goals",
+            "Discuss what you need help with",
+            "Plan the next steps together",
+          ].map((item) => (
+            <Box
+              key={item}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.8rem",
+                color: light.ink,
+              }}
+            >
+              <Box
+                aria-hidden="true"
+                sx={{
+                  width: 26,
+                  height: 26,
+                  display: "grid",
+                  placeItems: "center",
+                  flexShrink: 0,
+                  borderRadius: "50%",
+                  backgroundColor: light.tealWash,
+                  color: light.teal,
+                  fontSize: "0.8rem",
+                  fontWeight: 800,
+                }}
+              >
+                ✓
+              </Box>
+              <Typography sx={{ fontSize: { xs: "0.98rem", sm: "1.05rem" } }}>
+                {item}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
 
-    <Box
-      sx={{
-        display: "inline-flex",
-        maxWidth: "100%",
-        px: { xs: "0.7rem", sm: "1rem" },
-        py: "0.3rem",
-        mb: "1rem",
-        borderRadius: "8px",
-        border: "1px solid rgba(11,111,94,0.24)",
-        backgroundColor: light.tealWash,
-      }}
-    >
-      <Typography
+      <Box
+        component="form"
+        aria-label="Book a meeting form"
+        onSubmit={handleSubmit}
         sx={{
-          maxWidth: "100%",
-          color: light.teal,
-          fontWeight: 500,
-          fontSize: { xs: "0.9rem", sm: "1rem" },
-          overflowWrap: "anywhere",
+          p: { xs: "1.25rem", sm: "1.75rem", md: "2.25rem" },
+          borderRadius: { xs: "1rem", sm: "1.25rem" },
+          border: `1px solid ${light.hairSoft}`,
+          backgroundColor: light.plate,
+          boxShadow: light.lift,
         }}
       >
-        {company}
-      </Typography>
-    </Box>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+            gap: "1rem",
+          }}
+        >
+          <TextField
+            label="Full Name"
+            name="fullName"
+            placeholder="Your name"
+            required
+            disabled={isSending}
+            fullWidth
+            sx={fieldSx}
+          />
+          <TextField
+            label="Email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            required
+            disabled={isSending}
+            fullWidth
+            sx={fieldSx}
+          />
+          <TextField
+            select
+            label="Project Type"
+            name="projectType"
+            defaultValue=""
+            disabled={isSending}
+            fullWidth
+            sx={fieldSx}
+          >
+            <MenuItem value="" disabled>
+              Select project type
+            </MenuItem>
+            <MenuItem value="concept-design">Concept Design</MenuItem>
+            <MenuItem value="full-product-build">Full Product Build</MenuItem>
+            <MenuItem value="software-engineering">
+              Software Engineering
+            </MenuItem>
+            <MenuItem value="other">Other</MenuItem>
+          </TextField>
+          <TextField
+            select
+            label="Budget Range"
+            name="budgetRange"
+            defaultValue=""
+            disabled={isSending}
+            fullWidth
+            sx={fieldSx}
+          >
+            <MenuItem value="" disabled>
+              Select budget range
+            </MenuItem>
+            <MenuItem value="under-500">Under €500</MenuItem>
+            <MenuItem value="500-1000">€500 – €1,000</MenuItem>
+            <MenuItem value="1000-2500">€1,000 – €2,500</MenuItem>
+            <MenuItem value="2500-plus">€2,500+</MenuItem>
+            <MenuItem value="not-sure">Not sure yet</MenuItem>
+          </TextField>
+        </Box>
 
-    <Typography
-      sx={{
-        maxWidth: "100%",
-        color: light.inkSoft,
-        fontSize: { xs: "0.94rem", sm: "1.02rem" },
-        lineHeight: 1.6,
-        overflowWrap: "anywhere",
-      }}
-    >
-      {description}
-    </Typography>
+        <TextField
+          label="Project Details (Optional)"
+          name="projectDetails"
+          placeholder="Tell me about your project, goals, and what you need help with..."
+          multiline
+          minRows={5}
+          disabled={isSending}
+          fullWidth
+          sx={{ ...fieldSx, mt: "1rem" }}
+        />
+
+        <TextField
+          label="Preferred Meeting Time (Optional)"
+          name="preferredMeetingTime"
+          placeholder="e.g. Tuesday afternoon"
+          disabled={isSending}
+          fullWidth
+          sx={{ ...fieldSx, mt: "1rem" }}
+        />
+
+        {/* Honeypot: hidden from people, tempting to bots. */}
+        <Box
+          component="input"
+          type="checkbox"
+          name="botcheck"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          sx={{ display: "none" }}
+        />
+
+        <Button
+          type="submit"
+          variant="contained"
+          disableElevation
+          fullWidth
+          disabled={isSending}
+          startIcon={
+            isSending ? (
+              <CircularProgress size={18} sx={{ color: light.paper }} />
+            ) : undefined
+          }
+          sx={{
+            mt: "1.25rem",
+            minHeight: 50,
+            borderRadius: "10px",
+            backgroundColor: light.ink,
+            color: light.paper,
+            fontWeight: 650,
+            textTransform: "none",
+            "&:hover": {
+              backgroundColor: light.console,
+            },
+          }}
+        >
+          {isSending ? "Sending…" : "Book a Meeting  →"}
+        </Button>
+
+        <Box aria-live="polite" sx={{ minHeight: "1.5rem" }}>
+          {status === "success" && (
+            <Typography
+              sx={{
+                mt: "0.9rem",
+                p: "0.75rem 1rem",
+                borderRadius: "10px",
+                backgroundColor: light.tealWash,
+                color: light.teal,
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                lineHeight: 1.55,
+                textAlign: "center",
+              }}
+            >
+              Thanks — your message is on its way. I&apos;ll get back to you
+              shortly.
+            </Typography>
+          )}
+
+          {status === "error" && (
+            <Typography
+              sx={{
+                mt: "0.9rem",
+                p: "0.75rem 1rem",
+                borderRadius: "10px",
+                border: `1px solid ${light.hair}`,
+                color: light.ink,
+                fontSize: "0.9rem",
+                lineHeight: 1.55,
+                textAlign: "center",
+              }}
+            >
+              {errorMessage}
+            </Typography>
+          )}
+        </Box>
+
+        <Typography
+          sx={{
+            mt: "0.9rem",
+            color: light.inkFaint,
+            fontSize: "0.78rem",
+            lineHeight: 1.55,
+            textAlign: "center",
+          }}
+        >
+          Your information is only used to respond to your inquiry.
+        </Typography>
+      </Box>
+    </Box>
   </Box>
-);
+  );
+};
 
 const Row3 = () => (
   <>
-    <SkillSection title="Software Skills" skills={softwareSkills} />
-    <SkillSection title="Hardware Skills" skills={hardwareSkills} />
+    <ServicesSection />
+    <BookingSection />
 
-    <Box component="section" sx={sectionSx}>
-      <Box
+    <Box sx={{ px: { xs: "1rem", sm: "1.5rem", md: "4rem" } }}>
+      <Divider
         sx={{
           width: "100%",
           maxWidth: "1000px",
           mx: "auto",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          borderColor: light.hair,
         }}
-      >
-        <Typography variant="h3" sx={headingSx}>
-          My Experience
-        </Typography>
-        <SectionMark />
-
-        <Box
-          sx={{
-            width: "100%",
-            maxWidth: "800px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: { xs: "2rem", sm: "2.5rem" },
-          }}
-        >
-          {experienceData.map((experience) => (
-            <ExperienceItem
-              key={`${experience.year}-${experience.title}`}
-              {...experience}
-            />
-          ))}
-        </Box>
-
-        <Divider
-          sx={{
-            width: "80%",
-            mt: { xs: "3.5rem", sm: "4.5rem" },
-            borderColor: light.hair,
-          }}
-        />
-      </Box>
+      />
     </Box>
 
     <Box
@@ -373,7 +654,7 @@ const Row3 = () => (
       id="v"
       sx={{
         ...sectionSx,
-        pt: { xs: "2.5rem", sm: "3.5rem", md: "4.5rem" },
+        pt: { xs: "3rem", sm: "4rem", md: "4.5rem" },
         pb: { xs: "4rem", sm: "5rem", md: "6rem" },
         display: "flex",
         flexDirection: "column",
@@ -383,10 +664,12 @@ const Row3 = () => (
       <Typography
         variant="h3"
         sx={{
-          ...headingSx,
           mb: { xs: "2rem", sm: "3rem" },
           maxWidth: "100%",
+          color: light.ink,
           fontSize: "clamp(1.75rem, 7vw, 2.5rem)",
+          lineHeight: 1.08,
+          textAlign: "center",
           textTransform: "uppercase",
           letterSpacing: { xs: "0.08em", sm: "0.15em" },
         }}

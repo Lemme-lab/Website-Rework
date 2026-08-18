@@ -207,10 +207,14 @@ img {
   56%, 100% { transform: translateX(100%); }
 }
 
+/* 420svh, not 220: the back half of this track is the 288-frame Airframe
+   sequence. At the old height the whole animation scrubbed past inside
+   about a quarter of a viewport of scrolling — a couple of wheel clicks
+   for the entire reveal. */
 .project-scroll-track {
   position: relative;
-  height: 220svh;
-  min-height: 1200px;
+  height: 420svh;
+  min-height: 2300px;
   background: #060708;
 }
 
@@ -708,5 +712,400 @@ img {
 
   .project-stage__handoff {
     display: none;
+  }
+}
+
+/* ── Motion studies ───────────────────────────────────────────────
+   Three scroll-scrubbed sequences below the project field.
+
+   The section is the light release after the black contact sheet
+   above it: white sheet, graphite ink, and one instrument colour that
+   appears only where something is measuring. The renders are the
+   brightest thing on the page, which is the point.
+
+   Everything animated here is driven by two custom properties the
+   rAF loop writes on `.study`:
+     --dock  1 → 0   plate oversized and centred, then settled home
+     --tell  0 → 1   copy and drawing furniture arriving behind it
+   Only transform and opacity read from them.
+------------------------------------------------------------------ */
+.studies {
+  --sheet: #ffffff;
+  --tray: #eff2f4;
+  --graphite: #15181b;
+  --graphite-soft: #5b646c;
+  --rule: rgba(21, 24, 27, 0.11);
+  --rule-soft: rgba(21, 24, 27, 0.06);
+  --instrument: #0b6f5e;
+  --swing: cubic-bezier(0.32, 0.72, 0, 1);
+
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: clip;
+  color: var(--graphite);
+  background: var(--sheet);
+}
+
+/* Drawing-sheet grid, carried down from the project field above but
+   at a fraction of the weight. Static: it never repaints. */
+.studies::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image:
+    linear-gradient(var(--rule-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+  background-size: 5.5rem 5.5rem;
+  mask-image: linear-gradient(to bottom, black, transparent 22%);
+}
+
+/* ── opening ──────────────────────────────────────────────────── */
+.studies__intro {
+  position: relative;
+  z-index: 1;
+  max-width: 1460px;
+  margin: 0 auto;
+  padding: clamp(6rem, 12vw, 11rem) clamp(1.25rem, 5vw, 5rem) clamp(3rem, 6vw, 6rem);
+}
+
+.studies__eyebrow {
+  display: inline-block;
+  margin-bottom: clamp(1.6rem, 3.5vw, 2.6rem);
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(11, 111, 94, 0.08);
+  color: var(--instrument);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.studies__heading {
+  margin: 0 !important;
+  max-width: 16ch;
+  color: var(--graphite);
+  font-family: "Space Grotesk", sans-serif !important;
+  font-size: clamp(3.2rem, 8vw, 8.4rem) !important;
+  font-weight: 600 !important;
+  line-height: 0.86 !important;
+  letter-spacing: -0.065em !important;
+}
+
+/* The one serif word. The display pairing is the section's voice:
+   machined grotesk against a bookish italic. */
+.studies__heading em {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.045em;
+}
+
+.studies__lede {
+  max-width: 48ch;
+  margin: clamp(2rem, 4vw, 3.25rem) 0 0 !important;
+  color: var(--graphite-soft);
+  font-size: clamp(0.92rem, 1.2vw, 1.08rem) !important;
+  line-height: 1.72 !important;
+}
+
+/* ── runway + pinned stage ────────────────────────────────────── */
+.study {
+  --dock: 1;
+  --tell: 0;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 260svh;
+  min-height: 1200px;
+}
+
+.study__pin {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100svh;
+  min-height: 600px;
+  overflow: hidden;
+}
+
+.study__grid {
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding-inline: clamp(1rem, 2vw, 2.25rem);
+  display: grid;
+  /* The plate is the subject of the section: the copy column is sized
+     to its own comfortable measure and the plate takes every pixel that
+     is left, rather than the two splitting the row by ratio. Two column
+     fractions would have grown the copy in step with the plate on wide
+     screens, which is width spent on a sidebar. */
+  grid-template-columns: minmax(0, 1fr) clamp(18rem, 22vw, 23rem);
+  align-items: center;
+  gap: clamp(1.75rem, 2.8vw, 3rem);
+}
+
+/* `order` decides which grid track an item lands in, not just where it
+   paints — so flipping the sides has to flip the track sizes too, or the
+   right-docked plate ends up in the narrow column. */
+.study[data-side="right"] .study__grid {
+  grid-template-columns: clamp(18rem, 22vw, 23rem) minmax(0, 1fr);
+}
+
+.study[data-side="right"] .study__stage { order: 2; }
+.study[data-side="right"] .study__copy { order: 1; }
+
+/* The dolly. At --dock 1 the plate is oversized and pushed to the
+   middle of the stage; at 0 it is home in its column. --dir points it
+   at the centre from whichever side it lives on. */
+/* The zoom is tied to the height cap in ScrollSequence: the plate sits at
+   that cap once the column is wide enough, and 0.92 × 1.08 is 0.99 of the
+   pin. Any more and the dolly crops the top and bottom of the render off
+   against `.study__pin`'s hidden overflow — so buying a bigger settled
+   render costs zoom, and the render is what matters.
+
+   The sideways push is 24%, not the 46% it was: at 46% the entry parked
+   the render hard against the edge of the frame with the whole rest of
+   the stage empty, which read as bad placement rather than as a camera
+   move. It still arrives off-centre, just not off the edge. */
+.study__stage {
+  --dir: 1;
+  min-width: 0;
+  transform:
+    translate3d(calc(var(--dir) * var(--dock) * 24%), 0, 0)
+    scale(calc(1 + var(--dock) * 0.08));
+  will-change: transform;
+}
+
+.study[data-side="right"] .study__stage { --dir: -1; }
+
+/* ── the plate ────────────────────────────────────────────────── */
+/* Outer tray and inner window are separate enclosures with concentric
+   radii, so it reads as a milled part holding glass rather than a card. */
+/* `margin-inline: auto` is load-bearing. The plate carries a max-width in
+   svh so a tall frame cannot outgrow the pinned stage, and on a short or
+   wide window that cap bites before the column does — leaving the plate
+   narrower than its track. Without the auto margin it hugs the start edge
+   and strands the difference as dead space on one side, which reads as the
+   render being off-centre rather than as it being capped. */
+.plate {
+  position: relative;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.plate__core {
+  position: relative;
+  overflow: visible;
+  background: none;
+}
+
+.plate__still,
+.plate__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+  user-select: none;
+}
+
+/* `cover`, not `contain`: when the plate is framed tighter than the
+   frames were rendered the canvas centre-crops to match, and the still
+   has to crop the same way or frame 1 would jump the moment the canvas
+   takes over. The canvas is already drawn at the plate's exact ratio, so
+   `contain` above is a no-op for it either way. */
+.plate__still { object-fit: cover; }
+
+/* The still holds the plate only until frame 1 has decoded, then it is
+   taken out of the page entirely. `display: none`, not opacity: a
+   transparent sequence does not cover what is behind it, so anything
+   left underneath reads as a second, frozen copy of the subject. The
+   swap is invisible because frame 1 IS the still. */
+.plate__still { opacity: 1; }
+
+.plate__still[data-hidden="true"] { display: none; }
+
+.plate__canvas {
+  z-index: 1;
+  opacity: 0;
+}
+
+.plate__canvas[data-live="true"] { opacity: 1; }
+
+/* The instrument bar that used to sit under the plate — frame counter,
+   scrub rule and source path — has been removed. The render carries the
+   section on its own and nothing competes for the space beneath it. */
+
+/* ── copy ─────────────────────────────────────────────────────── */
+/* Each line is masked in behind the plate on its own offset, so the
+   column assembles rather than appearing all at once. */
+.study__copy {
+  min-width: 0;
+}
+
+.study__copy > * {
+  --t: 1;
+  opacity: var(--t);
+  transform: translate3d(0, calc((1 - var(--t)) * 1.4rem), 0);
+}
+
+.study__discipline { --t: clamp(0, calc(var(--tell) * 1.7), 1); }
+.study__name       { --t: clamp(0, calc((var(--tell) - 0.09) * 1.7), 1); }
+.study__kicker     { --t: clamp(0, calc((var(--tell) - 0.17) * 1.7), 1); }
+.study__body       { --t: clamp(0, calc((var(--tell) - 0.25) * 1.7), 1); }
+.study__spec       { --t: clamp(0, calc((var(--tell) - 0.33) * 1.7), 1); }
+
+.study__discipline {
+  display: block;
+  margin-bottom: clamp(1.1rem, 2.2vw, 1.7rem);
+  color: var(--instrument);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.study__name {
+  margin: 0 !important;
+  color: var(--graphite);
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-size: clamp(2rem, 3.9vw, 3.5rem) !important;
+  font-style: italic;
+  font-weight: 400 !important;
+  line-height: 0.96 !important;
+  letter-spacing: -0.045em !important;
+  text-wrap: balance;
+}
+
+.study__kicker {
+  display: block;
+  margin-top: clamp(0.7rem, 1.3vw, 1rem);
+  color: var(--graphite-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.study__body {
+  max-width: 34ch;
+  margin: clamp(1.5rem, 2.8vw, 2.2rem) 0 0 !important;
+  color: var(--graphite-soft);
+  font-size: clamp(0.88rem, 1.1vw, 1rem) !important;
+  line-height: 1.75 !important;
+}
+
+/* Spec rows read as a parts list: what it is, then what it took. */
+.study__spec {
+  margin: clamp(1.8rem, 3vw, 2.6rem) 0 0;
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.5fr) minmax(0, 1fr);
+  border-top: 1px solid var(--rule);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+}
+
+.study__spec dt,
+.study__spec dd {
+  margin: 0;
+  padding: 0.72rem 0;
+  border-bottom: 1px solid var(--rule-soft);
+  line-height: 1.5;
+}
+
+.study__spec dt {
+  color: rgba(21, 24, 27, 0.36);
+  text-transform: uppercase;
+}
+
+.study__spec dd {
+  color: var(--graphite);
+  padding-left: 1rem;
+}
+
+/* ── narrow ───────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .study {
+    height: 215svh;
+    min-height: 1000px;
+  }
+
+  .study__pin {
+    align-items: flex-start;
+    padding-top: clamp(2.5rem, 7vw, 4.5rem);
+  }
+
+  /* Both selectors, not just the bare one: the right-docked variant
+     sets its columns at a higher specificity, and a media query does
+     not add any — so listing only `.study__grid` here would leave the
+     right-docked studies in two columns on a phone. */
+  .study__grid,
+  .study[data-side="right"] .study__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(1.75rem, 5vw, 2.75rem);
+  }
+
+  /* The plate leads on every screen, so it takes the top slot
+     regardless of which side it docks to on desktop. */
+  .study .study__stage,
+  .study[data-side="right"] .study__stage { order: 1; }
+
+  .study .study__copy,
+  .study[data-side="right"] .study__copy { order: 2; }
+
+  /* No room to dolly sideways: the plate arrives by scale alone. */
+  .study__stage {
+    transform: scale(calc(1 + var(--dock) * 0.1));
+  }
+
+  .studies__heading {
+    font-size: clamp(3rem, 13.5vw, 5.8rem) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .study {
+    height: 190svh;
+    min-height: 880px;
+  }
+
+  .study__body { max-width: none; }
+
+  .plate { --shell: 0.4rem; --radius: 1.3rem; }
+}
+
+/* ── reduced motion ───────────────────────────────────────────── */
+/* No pin, no dolly, no scrub: each study becomes a plain still with
+   its copy beside it. */
+@media (prefers-reduced-motion: reduce) {
+  .study {
+    height: auto;
+    min-height: 0;
+  }
+
+  .study__pin {
+    position: relative;
+    top: auto;
+    height: auto;
+    min-height: 0;
+    padding-block: clamp(3rem, 8vw, 6rem);
+  }
+
+  .study__stage { transform: none; }
+
+  .study__copy > * {
+    opacity: 1;
+    transform: none;
   }
 }
