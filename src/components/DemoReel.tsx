@@ -14,6 +14,7 @@ type Reel = {
   poster: string;
   frameCount: number;
   aspect: number;
+  zoom?: number;
   kind?: "sequence" | "app-build";
   framePrefix?: string;
 };
@@ -36,6 +37,7 @@ const REELS: Reel[] = [
     frameCount: 240,
     framePrefix: "wuldor_v2",
     aspect: 4 / 3,
+    zoom: 1.1,
   },
   {
     slug: "app",
@@ -1445,6 +1447,9 @@ const DemoReel = () => {
                         }
                         aspect={
                           reel.aspect
+                        }
+                        zoom={
+                          reel.zoom ?? 1
                         }
                         label={reel.name}
                       />

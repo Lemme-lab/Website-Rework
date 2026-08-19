@@ -941,6 +941,19 @@ img {
 
 .plate__canvas[data-live="true"] { opacity: 1; }
 
+/* For featured project plates ensure the sequence uses `contain` framing
+   so the poster and canvas match the project's still without unintended
+   centre-cropping. The rule is specific to featured tiles to avoid
+   changing other sequences site-wide. */
+.project-tile--featured .plate__still {
+  object-fit: contain !important;
+}
+
+.project-tile--featured .plate__canvas {
+  object-fit: contain !important;
+  z-index: 2;
+}
+
 /* The instrument bar that used to sit under the plate — frame counter,
    scrub rule and source path — has been removed. The render carries the
    section on its own and nothing competes for the space beneath it. */

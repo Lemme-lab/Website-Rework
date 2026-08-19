@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Box, Link, Typography } from "@mui/material";
+import ScrollSequence, { type ScrollSequenceHandle } from "@/components/ScrollSequence";
 
 type Project = {
   name: string;
@@ -148,15 +149,16 @@ const AIRFRAME = {
 
 /* Frames are `/Images/reels/airframe/airframe_0001…0288.webp`, converted
  * from the 800×800 renders. All 288 frames are scrubbed across an extended
- * runway. The focused Airframe stage now fades to white; the featured image
- * keeps a soft mask during the handoff so the frame boundary blends
- * into a fully white Airframe section rather than ending as a hard rectangle.
+ * runway. The grid tile remains frame 1, and sequence frames are painted to
+ * a canvas so the visible media element never swaps src while scrolling.
  *
- * The old handoff went hero → transparent cutout → sequence, across three
- * different pictures of the watch — and two of them the wrong colourway.
- * The grid tile is now frame 1 itself, so there is only ever one image and
- * the handover cannot mismatch. */
+ * There is intentionally no feather / fade mask on the focused watch image:
+ * every frame is shown at full opacity all the way to its edge. */
 const AIRFRAME_FRAME_COUNT = 288;
+
+/* Keep the watch comfortably inside both the 3×3 tile and the focused reel.
+ * The same scale is used on the still and sequence so the handoff does not jump. */
+const AIRFRAME_MEDIA_SCALE = 0.58;
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -167,13 +169,8 @@ const smooth = (value: number, start: number, end: number) => {
 
 const Row2 = () => {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const airframeImageRef = useRef<HTMLImageElement | null>(null);
+  const seqRef = useRef<ScrollSequenceHandle | null>(null);
 
-  /*
-   * Sequence state is refs only. Nothing causes a React render while scrolling.
-   */
-  const currentFrameRef = useRef(-1);
-  const requestedFrameRef = useRef(-1);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -190,102 +187,28 @@ const Row2 = () => {
     /*
      * Warm the sequence into the HTTP cache before it is needed.
      *
-     * Frames are fetched on demand below, which is fine on a second pass
-     * but means the first scrub races the network frame by frame. Over 288
-     * frames that reads as the animation sticking. So once the track is
-     * within a viewport of the screen, pull the frames in order, a few at
-     * a time — by the time the zoom has finished the opening of the
-     * sequence is already local. `showFrame` still guards on decode, so
-     * this only ever changes how quickly it has something to show.
+     * Use fetch rather than throwaway Image objects here. The old warmer
+     * decoded hundreds of 800x800 frames in the background while the user
+     * was scrolling, which competes with the visible watch for decode / GPU
+     * time and can show up as small flashes. Fetching keeps the bytes warm;
+     * only the frame we are actually about to paint gets decoded.
      */
     let cancelled = false;
-    let warming = false;
 
-    const warmFrom = (start: number) => {
-      if (cancelled || start > AIRFRAME_FRAME_COUNT) return;
-
-      const end = Math.min(start + 6, AIRFRAME_FRAME_COUNT + 1);
-      let settled = 0;
-
-      const step = () => {
-        if (++settled === end - start) warmFrom(end);
-      };
-
-      for (let i = start; i < end; i++) {
-        const img = new Image();
-        img.decoding = "async";
-        img.onload = step;
-        img.onerror = step;
-        img.src = frameSrc(i);
-      }
-    };
-
-    const warmObserver = new IntersectionObserver(
-      (entries) => {
-        if (warming || !entries.some((e) => e.isIntersecting)) return;
-        warming = true;
-        warmObserver.disconnect();
-        warmFrom(1);
-      },
-      { rootMargin: "100% 0px" },
-    );
-
-    warmObserver.observe(track);
-
-    const showFrame = (frameIndex: number) => {
-      const image = airframeImageRef.current;
-      if (!image) return;
-
-      /*
-       * Frame -1  = original grid hero.
-       * Frame 1..N = the rendered sequence.
-       */
-      if (frameIndex < 1) {
-        requestedFrameRef.current = -1;
-        currentFrameRef.current = -1;
-
-        if (!image.src.endsWith(AIRFRAME_FIRST_FRAME)) {
-          image.src = AIRFRAME_FIRST_FRAME;
-        }
-
-        return;
-      }
-
-      if (
-        frameIndex === currentFrameRef.current ||
-        frameIndex === requestedFrameRef.current
-      ) {
-        return;
-      }
-
-      const src = frameSrc(frameIndex);
-
-      requestedFrameRef.current = frameIndex;
-
-      /*
-       * Critical:
-       * never point the visible <img> at a URL until it has loaded.
-       * Missing future renders therefore leave the last good frame visible.
-       */
-      const preload = new Image();
-      preload.decoding = "async";
-
-      preload.onload = () => {
-        if (requestedFrameRef.current !== frameIndex) return;
-
-        image.src = src;
-        currentFrameRef.current = frameIndex;
-        requestedFrameRef.current = -1;
-      };
-
-      preload.onerror = () => {
-        if (requestedFrameRef.current === frameIndex) {
-          requestedFrameRef.current = -1;
-        }
-      };
-
-      preload.src = src;
-    };
+    /*
+     * Keep frame decoding deliberately serialized.
+     *
+     * The previous canvas version created a brand-new Image/decode for every
+     * scroll target. A fast wheel/trackpad could therefore leave dozens of
+     * obsolete WebP decodes running at once. Even though stale frames were
+     * prevented from committing, those decodes still competed for CPU/GPU
+     * time and made the watch feel extremely jittery.
+     *
+     * This pipeline has one decode in flight, remembers a small LRU of frames,
+     * and always paints only the latest requested frame.
+     */
+    // We'll drive the `ScrollSequence` component directly via `seqRef`.
+    let lastSequenceFrame = -1;
 
     const draw = () => {
       raf = 0;
@@ -296,17 +219,11 @@ const Row2 = () => {
         track.style.setProperty("--center-copy-opacity", "1");
 
         track.style.setProperty("--airframe-bg-opacity", "0");
-        track.style.setProperty("--airframe-white-opacity", "0");
-        track.style.setProperty("--airframe-mask-size", "300%");
-        track.style.setProperty("--airframe-mask-solid", "100%");
         track.style.setProperty("--airframe-copy-opacity", "0");
         track.style.setProperty("--airframe-copy-y", "36px");
         track.style.setProperty("--airframe-feature-veil-opacity", "1");
-        track.style.setProperty("--airframe-mask-hold", "100%");
-        track.style.setProperty("--airframe-mask-end", "100%");
         track.style.setProperty("--airframe-art-x", "0%");
-
-        showFrame(-1);
+        seqRef.current?.setProgress(0);
 
         surroundingTiles.forEach((tile) => {
           tile.style.setProperty(
@@ -384,7 +301,7 @@ const Row2 = () => {
        * reached its final camera position.
        */
       if (p < 0.36) {
-        showFrame(-1);
+        seqRef.current?.setProgress(0);
       } else {
         /*
          * Use almost two thirds of the much taller track for the sequence.
@@ -393,14 +310,25 @@ const Row2 = () => {
          */
         const sequenceProgress = clamp((p - 0.36) / 0.62);
 
-        const sequenceFrame =
-          1 +
-          Math.round(
-            sequenceProgress *
-              (AIRFRAME_FRAME_COUNT - 1),
-          );
+          let sequenceFrame =
+            1 +
+            Math.round(
+              sequenceProgress * (AIRFRAME_FRAME_COUNT - 1),
+            );
 
-        showFrame(sequenceFrame);
+          // Limit per-frame jumps when the user scrolls quickly so we don't
+          // request a decode for every single skipped frame; this smooths
+          // motion and reduces decode pressure.
+          const MAX_STEP = 4; // frames per RAF
+          if (typeof lastSequenceFrame === "number") {
+            const delta = sequenceFrame - lastSequenceFrame;
+            if (Math.abs(delta) > MAX_STEP) {
+              sequenceFrame = lastSequenceFrame + Math.sign(delta) * MAX_STEP;
+            }
+          }
+
+          lastSequenceFrame = sequenceFrame;
+          seqRef.current?.setProgress(sequenceProgress);
       }
 
       /*
@@ -412,28 +340,10 @@ const Row2 = () => {
       /* Bring a full white stage in just before the frame sequence begins,
        * so transparent frames read against white everywhere, not just behind the copy. */
       const bg = smooth(p, 0.30, 0.36);
-      const white = 0;
 
       track.style.setProperty(
         "--airframe-bg-opacity",
         bg.toFixed(4),
-      );
-
-      /* Inert at 300%/100%, feathered at 64%/28% — see the mask on the
-       * featured tile's image. */
-      track.style.setProperty(
-        "--airframe-mask-size",
-        `${(300 - bg * 236).toFixed(1)}%`,
-      );
-
-      track.style.setProperty(
-        "--airframe-mask-solid",
-        `${(100 - bg * 72).toFixed(1)}%`,
-      );
-
-      track.style.setProperty(
-        "--airframe-white-opacity",
-        white.toFixed(4),
       );
 
       /* The grid tile has its own dark veil for legibility. Once Airframe
@@ -461,17 +371,6 @@ const Row2 = () => {
         `${((1 - copy) * 28).toFixed(2)}px`,
       );
 
-      /* Fade the right side of the opaque frame away before it reaches the
-       * copy. At rest both stops are 100%, so the 3x3 tile is unchanged. */
-      track.style.setProperty(
-        "--airframe-mask-hold",
-        `${(100 - copy * 48).toFixed(1)}%`,
-      );
-      track.style.setProperty(
-        "--airframe-mask-end",
-        `${(100 - copy * 30).toFixed(1)}%`,
-      );
-
       track.style.setProperty(
         "--airframe-art-x",
         `${(-20 * copy).toFixed(2)}%`,
@@ -494,13 +393,8 @@ const Row2 = () => {
     reducedMotion.addEventListener("change", schedule);
 
     return () => {
-      if (raf) {
-        window.cancelAnimationFrame(raf);
-      }
-
+      if (raf) window.cancelAnimationFrame(raf);
       cancelled = true;
-      warmObserver.disconnect();
-
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       reducedMotion.removeEventListener("change", schedule);
@@ -631,9 +525,8 @@ const Row2 = () => {
               pointerEvents: "none",
               opacity:
                 "var(--airframe-bg-opacity, 0)",
-              /* The focused watch section now fades onto a clean white
-               * stage. The image mask below softly feathers the rendered
-               * frame edges into this background. */
+              /* The focused watch section sits on a clean white stage.
+               * The watch frame itself stays fully opaque — no edge fade. */
               background: "#fff",
               willChange: "opacity",
             }}
@@ -684,69 +577,71 @@ const Row2 = () => {
                         : undefined
                     }
                   >
-                    <Box
-                      component="img"
-                      ref={
-                        project.featured
-                          ? airframeImageRef
-                          : undefined
-                      }
-                      className={`project-tile__media ${
-                        project.imageClassName ?? ""
-                      }`}
-                      src={project.image}
-                      alt=""
-                      loading={
-                        project.featured
-                          ? "eager"
-                          : "lazy"
-                      }
-                      decoding="async"
-                      draggable={false}
-                      sx={{
-                        objectFit:
-                          project.imageFit ??
-                          "cover",
-
-                        objectPosition:
-                          project.imagePosition ??
-                          "50% 50%",
-
-                        /*
-                         * This is the ONLY extra transform.
-                         * It doesn't affect the grid geometry.
-                         */
-                        ...(project.featured
-                          ? {
-                              transform:
-                                "translate3d(var(--airframe-art-x, 0%), 0, 0)",
-                              willChange:
-                                "transform",
-
-                              /*
-                               * Feather the frame into the white watch stage.
-                               *
-                               * The sequence opens on a lit environment —
-                               * rock and smoke on a grey falloff — and only
-                               * later drops to pure black. Unmasked, those
-                               * opening frames meet the black stage as a
-                               * hard square edge against the section.
-                               *
-                               * The two custom properties are driven from
-                               * the same value as the stage transition, and at rest
-                               * (300% / 100%) the gradient is opaque past
-                               * every corner — so this is inert while the
-                               * tile is still part of the 3x3 grid and only
-                               * bites as the white Airframe stage takes over.
-                               */
-                              maskImage:
-                                "linear-gradient(90deg, #000 0%, #000 var(--airframe-mask-hold, 100%), transparent var(--airframe-mask-end, 100%), transparent 100%)",
-                              WebkitMaskImage:
-                                "linear-gradient(90deg, #000 0%, #000 var(--airframe-mask-hold, 100%), transparent var(--airframe-mask-end, 100%), transparent 100%)",
-                            }
-                          : undefined),
-                      }}
-                    />
+                    {project.featured ? (
+                      <Box
+                        className={`project-tile__media ${
+                          project.imageClassName ?? ""
+                        }`}
+                        aria-hidden="true"
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          pointerEvents: "none",
+                          zIndex: 1,
+                          transform:
+                            `translateX(var(--airframe-art-x, 0%)) scale(${AIRFRAME_MEDIA_SCALE})`,
+                          transformOrigin: "50% 50%",
+                          transition: "none",
+                          willChange: "transform",
+                          '&, & > *': {
+                            width: '100% !important',
+                            height: '100% !important',
+                            maxWidth: 'none !important',
+                          },
+                          '& .plate, & .plate__core': {
+                            width: '100% !important',
+                            height: '100% !important',
+                            maxWidth: 'none !important',
+                          },
+                          '& .plate__still': {
+                            objectFit: 'contain',
+                            objectPosition: '50% 50%',
+                          },
+                          '& .plate__canvas': {
+                            objectFit: 'contain',
+                            objectPosition: '50% 50%',
+                          },
+                        }}
+                      >
+                        <ScrollSequence
+                          ref={seqRef}
+                          frameCount={AIRFRAME_FRAME_COUNT}
+                          frameSrc={frameSrc}
+                          poster={AIRFRAME_FIRST_FRAME}
+                          aspect={1}
+                          zoom={1}
+                          label={AIRFRAME.name}
+                        />
+                      </Box>
+                    ) : (
+                      <Box
+                        component="img"
+                        className={`project-tile__media ${
+                          project.imageClassName ?? ""
+                        }`}
+                        src={project.image}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                        sx={{
+                          objectFit: project.imageFit ?? "cover",
+                          objectPosition: project.imagePosition ?? "50% 50%",
+                        }}
+                      />
+                    )}
 
                     <Box
                       className="project-tile__veil"

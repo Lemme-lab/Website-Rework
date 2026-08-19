@@ -37,6 +37,8 @@ export type ScrollSequenceProps = {
   poster?: string;
   /** Frame aspect ratio (w / h). Reserves the plate before load. */
   aspect?: number;
+  /** Extra centre crop. 1 = no extra zoom, 1.08 = 8% tighter. */
+  zoom?: number;
   /** Subject of the reel, used for the accessible label. */
   label: string;
   /** How many frames to fetch at once. @default 6 */
@@ -49,7 +51,15 @@ const ScrollSequence = React.forwardRef<
   ScrollSequenceHandle,
   ScrollSequenceProps
 >(function ScrollSequence(
-  { frameCount, frameSrc, poster, aspect = 16 / 10, label, concurrency = 6 },
+  {
+    frameCount,
+    frameSrc,
+    poster,
+    aspect = 16 / 10,
+    zoom = 1,
+    label,
+    concurrency = 6,
+  },
   ref,
 ) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -108,6 +118,13 @@ const ScrollSequence = React.forwardRef<
       sh = Math.round(natW / aspect);
     }
 
+    // Optional extra crop for sequences that were rendered with too much
+    // dead space around the subject. Keeping this in the draw math means the
+    // still and every animation frame use exactly the same framing.
+    const safeZoom = Math.max(1, zoom);
+    sw = Math.max(1, Math.round(sw / safeZoom));
+    sh = Math.max(1, Math.round(sh / safeZoom));
+
     const sx = Math.round((natW - sw) / 2);
     const sy = Math.round((natH - sh) / 2);
 
@@ -120,9 +137,14 @@ const ScrollSequence = React.forwardRef<
     // its visual size changes every frame.
     const core = coreRef.current;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = core
-      ? Math.min(sw, Math.round(core.offsetWidth * dpr))
-      : sw;
+
+    // Match the canvas backing store to the rendered CSS size at device-pixel
+    // density. The old code capped the canvas at the source crop width, so a
+    // large on-screen reel was then enlarged again by the compositor and
+    // looked noticeably softer. This does not invent source detail, but it
+    // removes that extra low-resolution canvas scaling step.
+    const displayW = core ? Math.round(core.offsetWidth * dpr) : sw;
+    const w = Math.max(1, Math.min(displayW, 4096));
     const h = Math.max(1, Math.round((w / sw) * sh));
 
     if (canvas.width !== w || canvas.height !== h) {
@@ -137,7 +159,7 @@ const ScrollSequence = React.forwardRef<
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
     drawnRef.current = pick;
     if (!live) setLive(true);
-  }, [frameCount, live, aspect]);
+  }, [frameCount, live, aspect, zoom]);
 
   React.useImperativeHandle(
     ref,
@@ -222,7 +244,15 @@ const ScrollSequence = React.forwardRef<
       style={{ maxWidth: `calc(92svh * ${aspect})` }}
     >
 
-      <div className="plate__core" ref={coreRef} style={{ aspectRatio: `${aspect}` }}>
+      <div
+        className="plate__core"
+        ref={coreRef}
+        style={{
+          position: "relative",
+          aspectRatio: `${aspect}`,
+          overflow: "hidden",
+        }}
+      >
         {still && (
           <img
             className="plate__still"
@@ -232,6 +262,19 @@ const ScrollSequence = React.forwardRef<
             loading="lazy"
             decoding="async"
             draggable={false}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              opacity: live ? 0 : 1,
+              visibility: live ? "hidden" : "visible",
+              transition: "none",
+              pointerEvents: "none",
+              transform: `scale(${Math.max(1, zoom)})`,
+              transformOrigin: "50% 50%",
+            }}
             // Hidden the instant the canvas has frame 1. With an opaque
             // sequence the canvas covered this; a transparent one does
             // not, and the still would show through as a second, frozen
@@ -243,13 +286,22 @@ const ScrollSequence = React.forwardRef<
         {!missing && (
           <canvas
             className="plate__canvas"
-            // The still sits underneath at full strength for the whole
-            // life of the reel. The canvas simply covers it once frame 1
-            // has decoded, so there is never a gap to see through.
+            // Once frame 1 has decoded, the still is fully removed rather than
+            // left underneath. This matters for transparent frame sequences:
+            // otherwise frame 1 remains visible as a frozen ghost in the background.
             data-live={live ? "true" : "false"}
             ref={canvasRef}
             role="img"
             aria-label={`${label}, scroll-driven sequence`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "block",
+              width: "100%",
+              height: "100%",
+              opacity: live ? 1 : 0,
+              transition: "none",
+            }}
           />
         )}
       </div>
