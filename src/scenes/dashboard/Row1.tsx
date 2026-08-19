@@ -96,7 +96,7 @@ const Row1 = () => (
                 color: light.inkFaint,
               }}
             >
-              MULTI-DISCIPLINARY ENGINEER WITH 6 YEARS OF EXPERIENCE
+              MULTI-DISCIPLINARY ENGINEER WITH 8 YEARS OF EXPERIENCE
             </Typography>
 
             <Typography
@@ -127,11 +127,8 @@ const Row1 = () => (
                 color: light.inkSoft,
               }}
             >
-              With a foundation in Computer Science and expertise spanning from
-              full-stack development to AI and hardware design, I have engineered
-              and led large-scale student projects generating 5000€ in prize money
-              and multiple awards.
-            </Typography>
+              With a strong foundation in computer science, I independently design and develop complete technology solutions across full-stack development, artificial intelligence, and hardware engineering. I have led and delivered large-scale products and complex technical projects, several of which have received awards and industry recognition. From initial concept to final deployment, I handle the entire development process, turning ambitious ideas into reliable, real-world solutions.
+          </Typography>
           </DashboardBox>
         </Rise>
 

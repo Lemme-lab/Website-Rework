@@ -133,16 +133,16 @@ const PROJECTS: Project[] = [
 ];
 
 const AIRFRAME = {
-  discipline: "Hardware + product",
-  name: "Airframe",
-  kicker: "Smartwatch",
+  discipline: "Product engineering",
+  name: "Complete Product Design",
+  kicker: "From idea to a complete, working product",
   body:
-    "Concept through to working hardware, with the enclosure, electronics, firmware and companion software developed as one connected system. The sequence moves from the finished wearable into the engineering underneath it.",
+    "Products are developed as complete systems from the start. From initial requirements and architecture through prototyping, integration and validation, every part of the product is designed to work together—creating a clear path from concept to a production-ready solution.",
   spec: [
-    ["Enclosure", "Industrial design"],
-    ["Board", "PCB + power"],
-    ["Device", "Firmware"],
-    ["Phone", "Companion app"],
+    ["Concept", "Requirements + architecture"],
+    ["Prototype", "Integrated product development"],
+    ["Validation", "Testing + refinement"],
+    ["Delivery", "Documentation + handover"],
   ] as [string, string][],
 };
 
@@ -452,9 +452,8 @@ const Row2 = () => {
             component="p"
             className="project-field__lede"
           >
-            Nine projects across three connected
-            disciplines—from power electronics and
-            physical systems to silicon and software.
+End-to-end product engineering across electronics, embedded systems, and software—from concept and prototyping to integrated, production-ready solutions.
+
           </Typography>
         </Box>
 
@@ -714,7 +713,7 @@ const Row2 = () => {
            * It is invisible until the watch animation is underway.
            */}
           <Box
-            aria-label="Airframe project details"
+            aria-label="Complete product design service details"
             sx={{
               position: "absolute",
               zIndex: 20,

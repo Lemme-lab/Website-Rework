@@ -22,16 +22,16 @@ type Reel = {
 const REELS: Reel[] = [
   {
     slug: "wuldor",
-    discipline: "Hardware engineering",
-    name: "Electronics + Robotics",
-    kicker: "Custom electronics, embedded control and robotic systems",
+    discipline: "Embedded engineering",
+    name: "Embedded Design",
+    kicker: "Reliable electronics and embedded systems",
     body:
-      "Electronics, embedded systems and mechanical hardware are developed together around the real product requirements. From custom PCBs and sensors to motors, control systems and robotic mechanisms, each layer is engineered as part of one complete system.",
+      "The embedded core is developed around the requirements of the complete product. Electronics, firmware, sensing, control and communication are engineered together to create reliable systems that move cleanly from prototype to real-world deployment.",
     spec: [
-      ["Electronics", "Custom PCB design"],
-      ["Embedded", "Firmware + control"],
-      ["Robotics", "Motion + mechanisms"],
-      ["Integration", "Sensors + actuators"],
+      ["Electronics", "System + board design"],
+      ["Firmware", "Device logic + control"],
+      ["Integration", "Sensors + communication"],
+      ["Validation", "Testing + production readiness"],
     ],
     poster: "/Images/slider/wuldor-full-arm.webp",
     frameCount: 240,
@@ -42,15 +42,15 @@ const REELS: Reel[] = [
   {
     slug: "app",
     discipline: "Software engineering",
-    name: "Software Development",
-    kicker: "Apps, APIs and connected product software",
+    name: "Software & Security",
+    kicker: "Connected software built securely from the start",
     body:
-      "Software is developed as part of the product rather than added at the end. We build mobile applications, backend services, embedded integrations and secure connected systems from the device layer through to the final user experience.",
+      "Software is developed as part of the product architecture, not added afterwards. Applications, backend systems, device communication and security are designed as one connected platform—creating reliable products from the device layer through to the final user experience.",
     spec: [
-      ["Apps", "iOS + Android"],
-      ["Backend", "APIs + cloud services"],
-      ["Devices", "Firmware integration"],
-      ["Security", "Secure communication"],
+      ["Applications", "Web + mobile experiences"],
+      ["Backend", "APIs + connected services"],
+      ["Integration", "Device + software systems"],
+      ["Security", "Secure architecture + communication"],
     ],
     poster: "/Images/slider/airframe-app.webp",
     frameCount: 0,

@@ -3,13 +3,11 @@ import { Box } from "@mui/material";
 import { light } from "@/palette";
 
 /* ------------------------------------------------------------------
-   Console — a serial terminal, not a "hacker typing" gimmick.
+   Console — LEMME presented as an end-to-end product engineering service.
 
-   The conceit: LEMME is a board coming up on /dev/ttyUSB0 and this is
-   its boot log. Kernel-style timestamps carry real information (the
-   order things initialise in), which is why the log is the one place
-   on the site that gets numbered markers. Its facts mirror the service,
-   portfolio and contact copy elsewhere on the page.
+   The terminal focuses on what a client can engage LEMME to do: define,
+   build, validate and deliver complete technical products. The copy keeps
+   the engineering character while avoiding a CV-style list of technologies.
 ------------------------------------------------------------------- */
 
 type Tone = "dim" | "base" | "bright" | "ok" | "warn" | "mint";
@@ -30,28 +28,30 @@ const check = (ts: string, tag: string, detail: string): Line => ({
 /* Lines are intentionally short so every row stays on one line. Below 360px
    the renderer drops timestamps but keeps subsystem tags and results. */
 const LOG: Line[] = [
-  { segs: [["lucas@lemme", "mint"], [":~$ ", "dim"], ["boot --profile product", "bright"]], pause: 420 },
-  { segs: [["serial link ready / 115200 8N1", "dim"]], pause: 280 },
+  { segs: [["lemme@core", "mint"], [":~$ ", "dim"], ["init --profile product-engineering", "bright"]], pause: 420 },
+  { segs: [["engineering service online / concept-to-delivery", "dim"]], pause: 280 },
   { segs: [["", "dim"]] },
 
-  { ts: "0.000", tag: "IDENT", segs: [["LEMME / product engineering", "bright"]] },
-  { ts: "0.014", tag: "MAKER", segs: [["Lucas Lenarcic / Graz AT", "bright"]] },
-  { ts: "0.028", tag: "STATUS", segs: [["OPEN FOR PROJECTS", "mint"]] },
+  { ts: "0.000", tag: "IDENT", segs: [["LEMME / PRODUCT ENGINEERING", "bright"]] },
+  { ts: "0.014", tag: "FOUNDER", segs: [["LUCAS LENARCIC / INDEPENDENT ENGINEER", "bright"]] },
+  { ts: "0.028", tag: "SERVICE", segs: [["END-TO-END PRODUCT DEVELOPMENT", "mint"]] },
 
-  { ts: "0.041", tag: "STACK", segs: [["running system checks", "base"]], pause: 130 },
-  check("0.058", "HARDWARE", "PCB / POWER / DFM"),
-  check("0.075", "FIRMWARE", "EMBEDDED / UPDATE"),
-  check("0.092", "SOFTWARE", "APP / API / BACKEND"),
-  check("0.109", "PRODUCT", "ENCLOSURE / TEST"),
+  { ts: "0.041", tag: "SCOPE", segs: [["project delivery pipeline ready", "base"]], pause: 130 },
+  check("0.058", "DEFINE", "REQUIREMENTS / FEASIBILITY / SYSTEM PLAN"),
+  check("0.075", "BUILD", "PROTOTYPE / INTEGRATION / ITERATION"),
+  check("0.092", "VALIDATE", "TESTING / REFINEMENT / RELIABILITY"),
+  check("0.109", "DELIVER", "DOCUMENTATION / HANDOVER / DEPLOYMENT"),
+  check("0.126", "SUPPORT", "INTEGRATION / IMPROVEMENT / FOLLOW-THROUGH"),
 
-  { ts: "0.136", tag: "FLOW", segs: [["BRIEF > PROTOTYPE > PROD", "bright"]], pause: 100 },
-  { ts: "0.158", tag: "HANDOVER", segs: [["SOURCE / DOCS / OWNERSHIP", "mint"]] },
-  { ts: "0.181", tag: "SECURE", segs: [["DEVICE / LINK / BACKEND", "dim"]] },
-  { ts: "0.207", tag: "WORK", segs: [["AIRFRAME / WULDOR / CYCLO", "bright"]], pause: 100 },
-  { ts: "0.231", tag: "CONTACT", segs: [["lucas.lenarcic@gmail.com", "bright"]], pause: 180 },
-  { ts: "0.255", tag: "READY", segs: [["PROJECT CHANNEL OPEN", "mint"]], pause: 300 },
+  { ts: "0.153", tag: "PROCESS", segs: [["BRIEF > BUILD > VALIDATE > DELIVER", "bright"]], pause: 100 },
+  { ts: "0.175", tag: "OWNERSHIP", segs: [["ONE ENGINEER / FULL PROJECT CONTEXT", "mint"]] },
+  { ts: "0.198", tag: "APPROACH", segs: [["COMPLETE SYSTEMS / PRACTICAL EXECUTION", "bright"]] },
+  { ts: "0.221", tag: "PROOF", segs: [["LARGE-SCALE / AWARD-RECOGNIZED WORK", "bright"]], pause: 100 },
+  { ts: "0.244", tag: "ENGAGE", segs: [["SELECT PROJECTS / DIRECT COLLABORATION", "dim"]] },
+  { ts: "0.267", tag: "CONTACT", segs: [["lucas.lenarcic@gmail.com", "bright"]], pause: 180 },
+  { ts: "0.290", tag: "READY", segs: [["NEW PROJECT INTAKE OPEN", "mint"]], pause: 300 },
 
-  { segs: [["lucas@lemme", "mint"], [":", "dim"], ["~", "base"], ["$ ", "dim"]] },
+  { segs: [["lemme@core", "mint"], [":", "dim"], ["~", "base"], ["$ ", "dim"]] },
 ];
 
 const toneColor: Record<Tone, string> = {
@@ -160,7 +160,7 @@ const Console = () => {
             ))}
           </Box>
           <Box component="span" sx={{ color: light.consoleInk }}>
-            LEMME CORE
+            LEMME / ENGINEERING SERVICES
           </Box>
         </Box>
 
@@ -195,7 +195,7 @@ const Console = () => {
       <Box
         ref={bodyRef}
         className="serial-console__body"
-        aria-label="Boot log: services, delivery, production, security, proof and contact"
+        aria-label="LEMME product engineering service: project definition, development, validation, delivery and contact"
         aria-live="off"
         sx={{
           flex: "1 1 auto",
