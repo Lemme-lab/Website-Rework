@@ -156,9 +156,15 @@ const AIRFRAME = {
  * every frame is shown at full opacity all the way to its edge. */
 const AIRFRAME_FRAME_COUNT = 288;
 
-/* Keep the watch comfortably inside both the 3×3 tile and the focused reel.
- * The same scale is used on the still and sequence so the handoff does not jump. */
-const AIRFRAME_MEDIA_SCALE = 0.58;
+/* Fill the featured white tile edge-to-edge at focus, then ease the artwork
+ * down once the right-hand project copy fades in. */
+const AIRFRAME_MEDIA_SCALE_START = 1;
+const AIRFRAME_MEDIA_SCALE_END = 0.816;
+
+/* The Airframe renders have a little dead space around the subject, especially
+ * on the opening hero frame. Tighten the internal crop slightly so the watch
+ * feels like it actually occupies the focused box. */
+const AIRFRAME_SEQUENCE_ZOOM = 1.32;
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -223,6 +229,10 @@ const Row2 = () => {
         track.style.setProperty("--airframe-copy-y", "36px");
         track.style.setProperty("--airframe-feature-veil-opacity", "1");
         track.style.setProperty("--airframe-art-x", "0%");
+        track.style.setProperty(
+          "--airframe-art-scale",
+          AIRFRAME_MEDIA_SCALE_START.toFixed(4),
+        );
         seqRef.current?.setProgress(0);
 
         surroundingTiles.forEach((tile) => {
@@ -375,6 +385,15 @@ const Row2 = () => {
         "--airframe-art-x",
         `${(-20 * copy).toFixed(2)}%`,
       );
+
+      const artScale =
+        AIRFRAME_MEDIA_SCALE_START +
+        (AIRFRAME_MEDIA_SCALE_END - AIRFRAME_MEDIA_SCALE_START) * copy;
+
+      track.style.setProperty(
+        "--airframe-art-scale",
+        artScale.toFixed(4),
+      );
     };
 
     const schedule = () => {
@@ -491,12 +510,7 @@ const Row2 = () => {
         </Box>
       </Box>
 
-      {/*
-       * DO NOT add sx position/layout overrides to these three elements.
-       *
-       * These are deliberately identical to your ORIGINAL Row2 because
-       * your existing CSS owns the pinned 3x3 project layout.
-       */}
+
       <Box
         ref={trackRef}
         className="project-scroll-track"
@@ -583,6 +597,12 @@ const Row2 = () => {
                           project.imageClassName ?? ""
                         }`}
                         aria-hidden="true"
+                        style={{
+                          /* Inline on purpose: the stylesheet has a more-specific
+                           * .project-tile--featured .project-tile__media transform.
+                           * This makes the scroll-driven X offset actually apply. */
+                          transform: `translateX(var(--airframe-art-x, 0%)) scale(var(--airframe-art-scale, ${AIRFRAME_MEDIA_SCALE_START}))`,
+                        }}
                         sx={{
                           position: "absolute",
                           inset: 0,
@@ -590,8 +610,6 @@ const Row2 = () => {
                           height: "100%",
                           pointerEvents: "none",
                           zIndex: 1,
-                          transform:
-                            `translateX(var(--airframe-art-x, 0%)) scale(${AIRFRAME_MEDIA_SCALE})`,
                           transformOrigin: "50% 50%",
                           transition: "none",
                           willChange: "transform",
@@ -606,11 +624,11 @@ const Row2 = () => {
                             maxWidth: 'none !important',
                           },
                           '& .plate__still': {
-                            objectFit: 'contain',
+                            objectFit: 'cover',
                             objectPosition: '50% 50%',
                           },
                           '& .plate__canvas': {
-                            objectFit: 'contain',
+                            objectFit: 'cover',
                             objectPosition: '50% 50%',
                           },
                         }}
@@ -620,8 +638,8 @@ const Row2 = () => {
                           frameCount={AIRFRAME_FRAME_COUNT}
                           frameSrc={frameSrc}
                           poster={AIRFRAME_FIRST_FRAME}
-                          aspect={1}
-                          zoom={1}
+                          aspect={16 / 9}
+                          zoom={AIRFRAME_SEQUENCE_ZOOM}
                           label={AIRFRAME.name}
                         />
                       </Box>
@@ -643,19 +661,6 @@ const Row2 = () => {
                       />
                     )}
 
-                    <Box
-                      className="project-tile__veil"
-                      aria-hidden="true"
-                      sx={
-                        project.featured
-                          ? {
-                              opacity:
-                                "var(--airframe-feature-veil-opacity, 1)",
-                              willChange: "opacity",
-                            }
-                          : undefined
-                      }
-                    />
 
                     <Box className="project-tile__topline">
                       <Box

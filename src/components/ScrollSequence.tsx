@@ -43,6 +43,15 @@ export type ScrollSequenceProps = {
   label: string;
   /** How many frames to fetch at once. @default 6 */
   concurrency?: number;
+  /**
+   * Removes only the white pixels connected to the outside edge of the
+   * cropped frame. This is for renders that contain an opaque white sheet
+   * around the subject: the subject stays intact, but the stage behind it
+   * can actually show through.
+   */
+  knockoutEdgeWhite?: boolean;
+  /** White threshold used by `knockoutEdgeWhite`. @default 242 */
+  edgeWhiteThreshold?: number;
 };
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
@@ -59,6 +68,8 @@ const ScrollSequence = React.forwardRef<
     zoom = 1,
     label,
     concurrency = 6,
+    knockoutEdgeWhite = false,
+    edgeWhiteThreshold = 242,
   },
   ref,
 ) {
@@ -67,12 +78,86 @@ const ScrollSequence = React.forwardRef<
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
   const framesRef = React.useRef<(HTMLImageElement | null)[]>([]);
+  const processedFramesRef = React.useRef<(HTMLCanvasElement | null)[]>([]);
   const readyRef = React.useRef<boolean[]>([]);
   const drawnRef = React.useRef(-1);
   const progressRef = React.useRef(0);
 
   const [missing, setMissing] = React.useState(frameCount <= 0);
   const [live, setLive] = React.useState(false);
+
+  const removeConnectedEdgeWhite = React.useCallback((
+    img: HTMLImageElement,
+    frameIndex: number,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+  ) => {
+    if (!knockoutEdgeWhite) return img;
+
+    const cached = processedFramesRef.current[frameIndex];
+    if (cached && cached.width === sw && cached.height === sh) return cached;
+
+    const offscreen = document.createElement("canvas");
+    offscreen.width = sw;
+    offscreen.height = sh;
+
+    const offscreenContext = offscreen.getContext("2d", { willReadFrequently: true });
+    if (!offscreenContext) return img;
+
+    offscreenContext.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    const imageData = offscreenContext.getImageData(0, 0, sw, sh);
+    const { data } = imageData;
+    const total = sw * sh;
+    const seen = new Uint8Array(total);
+    const queue = new Int32Array(total);
+    let head = 0;
+    let tail = 0;
+
+    const isEdgeWhite = (pixel: number) => {
+      const offset = pixel * 4;
+      return (
+        data[offset + 3] > 0 &&
+        data[offset] >= edgeWhiteThreshold &&
+        data[offset + 1] >= edgeWhiteThreshold &&
+        data[offset + 2] >= edgeWhiteThreshold
+      );
+    };
+
+    const enqueue = (pixel: number) => {
+      if (seen[pixel] || !isEdgeWhite(pixel)) return;
+      seen[pixel] = 1;
+      queue[tail++] = pixel;
+    };
+
+    for (let x = 0; x < sw; x++) {
+      enqueue(x);
+      enqueue((sh - 1) * sw + x);
+    }
+
+    for (let y = 1; y < sh - 1; y++) {
+      enqueue(y * sw);
+      enqueue(y * sw + sw - 1);
+    }
+
+    while (head < tail) {
+      const pixel = queue[head++];
+      const offset = pixel * 4;
+      data[offset + 3] = 0;
+
+      const x = pixel % sw;
+      if (x > 0) enqueue(pixel - 1);
+      if (x < sw - 1) enqueue(pixel + 1);
+      if (pixel >= sw) enqueue(pixel - sw);
+      if (pixel < total - sw) enqueue(pixel + sw);
+    }
+
+    offscreenContext.putImageData(imageData, 0, 0);
+    processedFramesRef.current[frameIndex] = offscreen;
+    return offscreen;
+  }, [knockoutEdgeWhite, edgeWhiteThreshold]);
 
   // Frame 1 is the still, so swapping one for the other is the same
   // picture — no cross-fade needed, and none wanted: mid-fade both
@@ -94,7 +179,7 @@ const ScrollSequence = React.forwardRef<
         if (readyRef.current[i]) { pick = i; break; }
       }
     }
-    if (pick < 0 || pick === drawnRef.current) return;
+    if (pick < 0) return;
 
     const img = framesRef.current[pick];
     if (!img) return;
@@ -128,38 +213,46 @@ const ScrollSequence = React.forwardRef<
     const sx = Math.round((natW - sw) / 2);
     const sy = Math.round((natH - sh) / 2);
 
-    // Draw at the plate's own display resolution rather than the frame's
-    // natural size. The still underneath is downscaled by the browser's
-    // image path; a canvas left at 1280px wide gets downscaled by the
-    // compositor instead, and the two disagree along high-contrast edges
-    // — which is exactly the seam the handover is supposed to not have.
-    // Layout size, not getBoundingClientRect: the plate is mid-dolly and
-    // its visual size changes every frame.
+    // Render the canvas at the size it actually occupies on screen.
+    // The Airframe reel is enlarged by transforms on both the featured tile
+    // and its media wrapper. offsetWidth only reports the pre-transform layout
+    // size, which leaves the canvas too small and makes the browser upscale a
+    // low-resolution bitmap. getBoundingClientRect() includes those transforms,
+    // so the backing store now stays sharp at the final visual size.
     const core = coreRef.current;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-    // Match the canvas backing store to the rendered CSS size at device-pixel
-    // density. The old code capped the canvas at the source crop width, so a
-    // large on-screen reel was then enlarged again by the compositor and
-    // looked noticeably softer. This does not invent source detail, but it
-    // removes that extra low-resolution canvas scaling step.
-    const displayW = core ? Math.round(core.offsetWidth * dpr) : sw;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const visualRect = core?.getBoundingClientRect();
+    const visualWidth = visualRect?.width || core?.offsetWidth || sw;
+    const displayW = Math.round(visualWidth * dpr);
     const w = Math.max(1, Math.min(displayW, 4096));
     const h = Math.max(1, Math.round((w / sw) * sh));
 
-    if (canvas.width !== w || canvas.height !== h) {
+    const backingSizeChanged = canvas.width !== w || canvas.height !== h;
+    if (backingSizeChanged) {
       canvas.width = w;
       canvas.height = h;
     }
+
+    // Repaint when the CSS transform changes the visual size even if the
+    // sequence is still on the same frame. Without this, frame 1 can remain
+    // stuck at the tiny grid-tile resolution throughout the zoom-in.
+    if (pick === drawnRef.current && !backingSizeChanged) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+
+    const source = removeConnectedEdgeWhite(img, pick, sx, sy, sw, sh);
+    if (source instanceof HTMLCanvasElement) {
+      ctx.drawImage(source, 0, 0, sw, sh, 0, 0, w, h);
+    } else {
+      ctx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
+    }
+
     drawnRef.current = pick;
     if (!live) setLive(true);
-  }, [frameCount, live, aspect, zoom]);
+  }, [frameCount, live, aspect, zoom, removeConnectedEdgeWhite]);
 
   React.useImperativeHandle(
     ref,
@@ -178,6 +271,7 @@ const ScrollSequence = React.forwardRef<
     if (!root) return;
 
     framesRef.current = new Array(frameCount).fill(null);
+    processedFramesRef.current = new Array(frameCount).fill(null);
     readyRef.current = new Array(frameCount).fill(false);
     drawnRef.current = -1;
 
@@ -274,6 +368,7 @@ const ScrollSequence = React.forwardRef<
               pointerEvents: "none",
               transform: `scale(${Math.max(1, zoom)})`,
               transformOrigin: "50% 50%",
+              mixBlendMode: knockoutEdgeWhite ? "multiply" : undefined,
             }}
             // Hidden the instant the canvas has frame 1. With an opaque
             // sequence the canvas covered this; a transparent one does
